@@ -7,8 +7,146 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once '../Config/database.php';
-?>
-<?php
+
+
+// -------------------------------------------------
+// CRUD VARIABLES
+// -------------------------------------------------
+
+$job_id = -1;
+$job_number = "";
+$job_name = "";
+$customer_name = "";
+$address = "";
+$city = "";
+$state = "";
+$zip_code = "";
+$scope_description = "";
+$status = "";
+$completed_date = "";
+
+$add = false;
+$edit = false;
+$update = false;
+$delete = false;
+
+
+// -------------------------------------------------
+// DETERMINE CRUD OPERATION
+// -------------------------------------------------
+
+if (isset($_POST['job_id'])) {
+
+    $job_id = (int) $_POST['job_id'];
+
+    $add = isset($_POST['add']);
+    $edit = isset($_POST['edit']);
+    $update = isset($_POST['update']);
+    $delete = isset($_POST['delete']);
+}
+
+
+// -------------------------------------------------
+// ADD JOB
+// -------------------------------------------------
+
+if ($add) {
+
+    $job_name = $_POST['job_name'];
+    $customer_name = $_POST['customer_name'];
+    $address = $_POST['address'];
+    $city = $_POST['city'];
+    $state = $_POST['state'];
+    $zip_code = $_POST['zip_code'];
+    $scope_description = $_POST['scope_description'];
+    $status = $_POST['status'];
+    $completed_date = $_POST['completed_date'];
+
+    $addQuery = "
+        INSERT INTO jobs
+        (
+            job_name,
+            customer_name,
+            address,
+            city,
+            state,
+            zip_code,
+            scope_description,
+            status,
+            completed_date
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))
+    ";
+
+    $stmt = $conn->prepare($addQuery);
+
+    $stmt->bind_param(
+        "sssssssss",
+        $job_name,
+        $customer_name,
+        $address,
+        $city,
+        $state,
+        $zip_code,
+        $scope_description,
+        $status,
+        $completed_date
+    );
+
+    $stmt->execute();
+
+    // Reset form variables
+    $job_id = -1;
+    $job_name = "";
+    $customer_name = "";
+    $address = "";
+    $city = "";
+    $state = "";
+    $zip_code = "";
+    $scope_description = "";
+    $status = "";
+    $completed_date = "";
+}
+
+
+// -------------------------------------------------
+// EDIT JOB
+// -------------------------------------------------
+
+else if ($edit) {
+
+    $selQuery = "
+        SELECT *
+        FROM jobs
+        WHERE job_id = ?
+    ";
+
+    $stmt = $conn->prepare($selQuery);
+    $stmt->bind_param("i", $job_id);
+    $stmt->execute();
+
+    // Use a separate result variable for the selected job
+    $editResult = $stmt->get_result();
+    $row = $editResult->fetch_assoc();
+
+    if ($row) {
+        $job_number = $row['job_number'];
+        $job_name = $row['job_name'];
+        $customer_name = $row['customer_name'];
+        $address = $row['address'];
+        $city = $row['city'];
+        $state = $row['state'];
+        $zip_code = $row['zip_code'];
+        $scope_description = $row['scope_description'];
+        $status = $row['status'];
+        $completed_date = $row['completed_date'];
+    }
+}
+
+
+// -------------------------------------------------
+// SEARCH JOBS
+// -------------------------------------------------
 
 $search = '';
 
@@ -41,7 +179,6 @@ if ($search !== '') {
     );
 
     $stmt->execute();
-
     $result = $stmt->get_result();
 
 } else {
@@ -56,6 +193,8 @@ if ($search !== '') {
 }
 
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -89,16 +228,17 @@ if ($search !== '') {
 <main>
 
     <section>
-
         <h2>Jobs</h2>
 
         <p>
             Search for a job by job number, project name,
             customer, or status.
         </p>
-
     </section>
-        <section class="panel">
+
+
+    <!-- SEARCH -->
+    <section class="panel">
 
         <form method="GET" action="jobs.php">
 
@@ -127,73 +267,110 @@ if ($search !== '') {
         </form>
 
     </section>
+
+
+    <!-- JOB RESULTS -->
     <section class="panel">
 
-    <h2>Job Results</h2>
+        <h2>Job Results</h2>
 
-    <?php if ($result->num_rows > 0): ?>
+        <?php if ($result->num_rows > 0): ?>
 
-        <table>
+            <table>
 
-            <thead>
-                <tr>
-                    <th>Job #</th>
-                    <th>Job Name</th>
-                    <th>Customer</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
+                <thead>
+                    <tr>
+                        <th>Job #</th>
+                        <th>Job Name</th>
+                        <th>Customer</th>
+                        <th>Status</th>
+                        <th>View</th>
+                        <th>Edit</th>
+                        <th>Delete</th>
+                    </tr>
+                </thead>
 
-            <tbody>
+                <tbody>
 
-            <?php while ($job = $result->fetch_assoc()): ?>
+                <?php while ($job = $result->fetch_assoc()): ?>
 
-                <tr>
+                    <tr>
 
-                    <td>
-                        <?php echo htmlspecialchars($job['job_number']); ?>
-                    </td>
+                        <td>
+                            <?php echo htmlspecialchars($job['job_number']); ?>
+                        </td>
 
-                    <td>
-                        <?php echo htmlspecialchars($job['job_name']); ?>
-                    </td>
+                        <td>
+                            <?php echo htmlspecialchars($job['job_name']); ?>
+                        </td>
 
-                    <td>
-                        <?php echo htmlspecialchars($job['customer_name']); ?>
-                    </td>
+                        <td>
+                            <?php echo htmlspecialchars($job['customer_name']); ?>
+                        </td>
 
-                    <td>
-                        <?php echo htmlspecialchars($job['status']); ?>
-                    </td>
+                        <td>
+                            <?php echo htmlspecialchars($job['status']); ?>
+                        </td>
 
-                    <td>
+                        <td>
+                            <a
+                                href="job_view.php?job_id=<?php echo $job['job_id']; ?>"
+                                class="button"
+                            >
+                                View Job
+                            </a>
+                        </td>
 
-                        <a
-                            href="job_view.php?job_id=<?php echo $job['job_id']; ?>"
-                            class="button"
-                        >
-                            View Job
-                        </a>
+                        <td>
+                            <form method="POST" action="jobs.php">
 
-                    </td>
+                                <input
+                                    type="hidden"
+                                    name="job_id"
+                                    value="<?php echo $job['job_id']; ?>"
+                                >
 
-                </tr>
+                                <button type="submit" name="edit">
+                                    Edit Job
+                                </button>
 
-            <?php endwhile; ?>
+                            </form>
+                        </td>
 
-            </tbody>
+                        <td>
+                            <form method="POST" action="jobs.php">
 
-        </table>
+                                <input
+                                    type="hidden"
+                                    name="job_id"
+                                    value="<?php echo $job['job_id']; ?>"
+                                >
 
-    <?php else: ?>
+                                <button type="submit" name="delete">
+                                    Delete Job
+                                </button>
 
-        <p>No jobs found.</p>
+                            </form>
+                        </td>
 
-    <?php endif; ?>
+                    </tr>
 
-</section>
+                <?php endwhile; ?>
+
+                </tbody>
+
+            </table>
+
+        <?php else: ?>
+
+            <p>No jobs found.</p>
+
+        <?php endif; ?>
+
+    </section>
+
 </main>
+
 
 <footer>
     <p>&copy; 2026 FieldLedger</p>
